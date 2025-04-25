@@ -1,76 +1,79 @@
 #!/bin/bash
+
+# WhatsApp Bot Hosting Setup Script for Pterodactyl
+# VPS IP: 146.190.95.209 | Ubuntu 22.04
+
 set -e
 
-echo "System updating..."
-sudo apt update -y && sudo apt upgrade -y
+MYSQL_ROOT_PASS="Alexpair#727"
+PANEL_DB_PASS="Alexpair#727"
+PANEL_EMAIL="alexidprogrammerofficial@gmail.com"
+PANEL_URL="http://146.190.95.209"
+TIMEZONE="Asia/Colombo"
 
-echo "Installing required packages..."
-sudo apt install -y curl wget zip unzip tar nginx mariadb-server redis-server \
-php php-cli php-mysql php-gd php-mbstring php-xml php-curl php-zip php-bcmath \
-php-tokenizer php-common php-fpm php-mysqlnd php-memcached php-redis git composer
+echo "[1/10] Updating..."
+apt update -y && apt upgrade -y
 
-echo "Starting services..."
-sudo systemctl enable mariadb
-sudo systemctl start mariadb
-sudo systemctl enable redis-server
-sudo systemctl start redis-server
+echo "[2/10] Installing packages..."
+apt install -y nginx mysql-server php php-cli php-mbstring php-zip php-bcmath php-gd php-curl php-mysql php-xml php-fpm unzip curl git redis-server composer ufw docker.io docker-compose
 
-echo "Creating Pterodactyl database and user..."
-sudo mysql -e "DROP DATABASE IF EXISTS panel;"
-sudo mysql -e "CREATE DATABASE panel;"
-sudo mysql -e "CREATE USER IF NOT EXISTS 'paneluser'@'localhost' IDENTIFIED BY 'strongpassword';"
-sudo mysql -e "GRANT ALL PRIVILEGES ON panel.* TO 'paneluser'@'localhost';"
-sudo mysql -e "FLUSH PRIVILEGES;"
+echo "[3/10] Enabling services..."
+systemctl enable --now redis-server mysql docker
 
-echo "Downloading Pterodactyl panel..."
-cd /var/www
-sudo curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
-sudo mkdir -p /var/www/pterodactyl
-sudo tar -xzvf panel.tar.gz -C /var/www/pterodactyl
+echo "[4/10] Configuring MySQL..."
+mysql -e "ALTER USER 'root'@'localhost' IDENTIFIED WITH mysql_native_password BY '$MYSQL_ROOT_PASS'; FLUSH PRIVILEGES;"
+mysql -uroot -p$MYSQL_ROOT_PASS -e "CREATE DATABASE panel;"
+mysql -uroot -p$MYSQL_ROOT_PASS -e "CREATE USER 'ptero'@'127.0.0.1' IDENTIFIED BY '$PANEL_DB_PASS';"
+mysql -uroot -p$MYSQL_ROOT_PASS -e "GRANT ALL ON panel.* TO 'ptero'@'127.0.0.1'; FLUSH PRIVILEGES;"
+
+echo "[5/10] Installing Pterodactyl Panel..."
+mkdir -p /var/www/pterodactyl
 cd /var/www/pterodactyl
-
+curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
+tar -xzvf panel.tar.gz && rm panel.tar.gz
 cp .env.example .env
 composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 
-echo "Setting up environment..."
-php artisan p:environment:setup --author="alexidprogrammerofficial@gmail.com" --url="http://46.137.203.164" --timezone="Asia/Colombo" --cache="redis" --session="redis" --queue="redis" --no-interaction
-php artisan p:environment:database --host=127.0.0.1 --port=3306 --database=panel --username=paneluser --password=strongpassword --no-interaction
-php artisan p:environment:mail --driver=log --no-interaction
+php artisan p:environment:setup --author="ALEX" --email="$PANEL_EMAIL" --url="$PANEL_URL" --timezone="$TIMEZONE" --cache="redis" --session="redis" --queue="redis"
 
-echo "Running database migrations..."
+php artisan p:environment:database --host=127.0.0.1 --port=3306 --database=panel --username=ptero --password="$PANEL_DB_PASS"
+
 php artisan migrate --seed --force
-
-echo "Creating admin user..."
-php artisan p:user:make --email=alexidprogrammerofficial@gmail.com --username=admin --password=Alexpair#727 --admin=1
-
-echo "Fixing file permissions..."
 chown -R www-data:www-data /var/www/pterodactyl
 chmod -R 755 storage/* bootstrap/cache/
 
-echo "Configuring NGINX..."
-sudo bash -c 'cat > /etc/nginx/sites-available/pterodactyl <<EOF
+echo "[6/10] Configuring NGINX..."
+cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
-    server_name 46.137.203.164;
+    server_name 146.190.95.209;
 
     root /var/www/pterodactyl/public;
     index index.php;
 
     location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
+        try_files \$uri \$uri/ /index.php;
     }
 
-    location ~ \.php\$ {
+    location ~ \.php$ {
         include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
+        fastcgi_pass unix:/run/php/php8.1-fpm.sock;
+    }
+
+    location ~ /\.ht {
+        deny all;
     }
 }
-EOF'
+EOF
 
-sudo ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
-sudo nginx -t && sudo systemctl reload nginx
+ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
+nginx -t && systemctl reload nginx
 
-echo "Pterodactyl installation complete! Visit: http://46.137.203.164"
+echo "[7/10] Installing Wings..."
+curl -L https://github.com/pterodactyl/wings/releases/latest/download/wings_linux_amd64 -o /usr/local/bin/wings
+chmod +x /usr/local/bin/wings
+mkdir -p /etc/pterodactyl
+
+echo "[8/10] Done!"
+echo "Visit: http://146.190.95.209 and finish setup (create admin)."
