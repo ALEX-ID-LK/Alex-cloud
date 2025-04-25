@@ -1,29 +1,30 @@
 #!/bin/bash
 
-# Exit on any failure
+# Exit if error
 set -e
 
 echo "System updating..."
-apt update -y && apt upgrade -y
+sudo apt update -y && sudo apt upgrade -y
 
 echo "Installing required packages..."
-apt install -y curl wget zip unzip tar nginx mariadb-server php php-cli php-mysql php-gd php-mbstring php-xml php-curl php-zip php-bcmath php-tokenizer php-common php-fpm php-mysqlnd php-memcached php-redis redis git composer
+sudo apt install -y curl wget zip unzip tar nginx mariadb-server php php-cli php-mysql php-gd php-mbstring php-xml php-curl php-zip php-bcmath php-tokenizer php-common php-fpm php-mysqlnd php-memcached php-redis redis git composer
 
 echo "Starting MariaDB..."
-systemctl enable mariadb
-systemctl start mariadb
+sudo systemctl enable mariadb
+sudo systemctl start mariadb
 
-echo "Creating database and user..."
-mysql -e "CREATE DATABASE panel;"
-mysql -e "CREATE USER 'paneluser'@'localhost' IDENTIFIED BY 'strongpassword';"
-mysql -e "GRANT ALL PRIVILEGES ON panel.* TO 'paneluser'@'localhost';"
-mysql -e "FLUSH PRIVILEGES;"
+echo "Dropping old DB if exists..."
+sudo mysql -e "DROP DATABASE IF EXISTS panel;"
+sudo mysql -e "CREATE DATABASE panel;"
+sudo mysql -e "CREATE USER IF NOT EXISTS 'paneluser'@'localhost' IDENTIFIED BY 'strongpassword';"
+sudo mysql -e "GRANT ALL PRIVILEGES ON panel.* TO 'paneluser'@'localhost';"
+sudo mysql -e "FLUSH PRIVILEGES;"
 
 echo "Downloading Pterodactyl panel..."
 cd /var/www
-curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
-mkdir -p /var/www/pterodactyl
-tar -xzvf panel.tar.gz -C /var/www/pterodactyl
+sudo curl -Lo panel.tar.gz https://github.com/pterodactyl/panel/releases/latest/download/panel.tar.gz
+sudo mkdir -p /var/www/pterodactyl
+sudo tar -xzvf panel.tar.gz -C /var/www/pterodactyl
 cd /var/www/pterodactyl
 
 cp .env.example .env
@@ -42,7 +43,28 @@ chown -R www-data:www-data /var/www/pterodactyl
 chmod -R 755 storage/* bootstrap/cache/
 
 echo "Configuring NGINX..."
-cat > /etc/nginx/sites-available/pterodactyl <<EOF
+sudo bash -c 'cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
-    server_name 46
+    server_name 46.137.203.164;
+
+    root /var/www/pterodactyl/public;
+    index index.php;
+
+    location / {
+        try_files \$uri \$uri/ /index.php?\$query_string;
+    }
+
+    location ~ \.php\$ {
+        include snippets/fastcgi-php.conf;
+        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
+        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include fastcgi_params;
+    }
+}
+EOF'
+
+sudo ln -sf /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
+sudo nginx -t && sudo systemctl reload nginx
+
+echo "Pterodactyl panel installed successfully!"
