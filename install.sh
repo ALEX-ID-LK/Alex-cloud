@@ -31,7 +31,7 @@ composer install --no-dev --optimize-autoloader
 php artisan key:generate --force
 
 echo "Configuring environment..."
-php artisan p:environment:setup --author="Alex ID" --url="http://46.137.203.164" --timezone="Asia/Colombo" --cache="redis" --session="redis" --queue="redis" --no-interaction
+php artisan p:environment:setup --author="alexidprogrammerofficial@gmail.com" --url="http://46.137.203.164" --timezone="Asia/Colombo" --cache="redis" --session="redis" --queue="redis" --no-interaction
 php artisan p:environment:database --host=127.0.0.1 --port=3306 --database=panel --username=paneluser --password=strongpassword --no-interaction
 php artisan p:environment:mail --driver=log --no-interaction
 
@@ -45,25 +45,4 @@ echo "Configuring NGINX..."
 cat > /etc/nginx/sites-available/pterodactyl <<EOF
 server {
     listen 80;
-    server_name 46.137.203.164;
-
-    root /var/www/pterodactyl/public;
-    index index.php;
-
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-
-    location ~ \.php\$ {
-        include snippets/fastcgi-php.conf;
-        fastcgi_pass unix:/run/php/php8.2-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-}
-EOF
-
-ln -s /etc/nginx/sites-available/pterodactyl /etc/nginx/sites-enabled/
-nginx -t && systemctl reload nginx
-
-echo "Pterodactyl installed successfully!"
+    server_name 46
