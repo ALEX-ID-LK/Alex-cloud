@@ -1,0 +1,23 @@
+{
+  "name": "WhatsApp Bot (Baileys)",
+  "description": "Node.js based WhatsApp bot using Baileys library.",
+  "docker_images": {
+    "Node.js": "ghcr.io/parkervcp/yolks:nodejs_18"
+  },
+  "file_denylist": [],
+  "startup": "npm install && node .",
+  "config": {
+    "files": "{}",
+    "startup": "{startup}",
+    "logs": "logs/latest.log",
+    "stop": "stop"
+  },
+  "scripts": {
+    "installation": {
+      "script": "apt update && apt install -y curl && curl -sL https://deb.nodesource.com/setup_18.x | bash - && apt install -y nodejs",
+      "container": "debian:bullseye-slim"
+    }
+  },
+  "env": [],
+  "variables": []
+}
